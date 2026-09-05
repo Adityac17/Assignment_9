@@ -1,0 +1,433 @@
+{
+  "info": {
+    "name": "Pharmacy & Healthcare Store API",
+    "_postman_id": "a9c0b3f1-0a09-4d2e-9f0a-assignment09api",
+    "description": "RBAC + JWT Pharmacy API. Covers all three roles (customer, pharmacist, admin) with token headers.\n\nRun requests top-to-bottom. Login requests automatically save the returned JWT into collection variables (customerToken / pharmacistToken / adminToken) and created ids (medicineId / orderId) so later requests are wired up.\n\nNOTE ON STOCK DEDUCTION: Stock is NOT reduced when an order is placed. It is decremented atomically only on the FIRST time an order transitions to 'approved' (via PATCH /orders/:id/status). Re-approving an already-approved order does NOT decrement again. To verify: (1) note a medicine's stockQuantity via GET /medicines, (2) place an order as customer, (3) confirm stock unchanged, (4) approve the order as pharmacist, (5) GET the medicine again and confirm stock dropped by the ordered quantity, (6) approve again and confirm no further change.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "adminSecret", "value": "super_secret_admin_key" },
+    { "key": "customerToken", "value": "" },
+    { "key": "pharmacistToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "medicineId", "value": "" },
+    { "key": "orderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Customer (public)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cara Customer\",\n  \"email\": \"cara.customer@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register Staff - Pharmacist (needs ADMIN_SECRET_KEY)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('pharmacistToken', pm.response.json().data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-admin-secret", "value": "{{adminSecret}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/auth/register-staff", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register-staff"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Phil Pharmacist\",\n  \"email\": \"phil.pharmacist@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"pharmacist\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register Staff - Admin (needs ADMIN_SECRET_KEY)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('adminToken', pm.response.json().data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-admin-secret", "value": "{{adminSecret}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/auth/register-staff", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register-staff"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ada Admin\",\n  \"email\": \"ada.admin@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Register Staff - WRONG secret (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-admin-secret", "value": "wrong_key" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/auth/register-staff", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register-staff"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mal Actor\",\n  \"email\": \"mal@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('customerToken', pm.response.json().data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cara.customer@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Pharmacist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('pharmacistToken', pm.response.json().data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"phil.pharmacist@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('adminToken', pm.response.json().data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ada.admin@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Profile (customer)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/profile", "host": ["{{baseUrl}}"], "path": ["api", "auth", "profile"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Medicines",
+      "item": [
+        {
+          "name": "List Medicines (public, search+category)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/medicines?search=para&category=Analgesic",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "medicines"],
+              "query": [
+                { "key": "search", "value": "para" },
+                { "key": "category", "value": "Analgesic" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Medicine as Pharmacist (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('medicineId', pm.response.json().data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/medicines", "host": ["{{baseUrl}}"], "path": ["api", "medicines"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Paracetamol 500mg\",\n  \"brand\": \"Calpol\",\n  \"category\": \"Analgesic\",\n  \"dosageForm\": \"Tablet\",\n  \"price\": 25,\n  \"stockQuantity\": 100,\n  \"requiresPrescription\": false,\n  \"expiryDate\": \"2026-10-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Prescription Medicine as Pharmacist (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/medicines", "host": ["{{baseUrl}}"], "path": ["api", "medicines"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Amoxicillin 250mg\",\n  \"brand\": \"Mox\",\n  \"category\": \"Antibiotic\",\n  \"dosageForm\": \"Capsule\",\n  \"price\": 80,\n  \"stockQuantity\": 40,\n  \"requiresPrescription\": true,\n  \"expiryDate\": \"2026-09-20\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Medicine as Customer (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/medicines", "host": ["{{baseUrl}}"], "path": ["api", "medicines"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Should Fail\",\n  \"brand\": \"X\",\n  \"category\": \"Y\",\n  \"dosageForm\": \"Tablet\",\n  \"price\": 10,\n  \"stockQuantity\": 5,\n  \"expiryDate\": \"2026-12-01\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Medicine stock/price as Pharmacist",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/medicines/{{medicineId}}", "host": ["{{baseUrl}}"], "path": ["api", "medicines", "{{medicineId}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stockQuantity\": 120,\n  \"price\": 27\n}"
+            }
+          }
+        },
+        {
+          "name": "Expiring-soon report (pharmacist/admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/medicines/expiring", "host": ["{{baseUrl}}"], "path": ["api", "medicines", "expiring"] }
+          }
+        },
+        {
+          "name": "Expiring-soon as Customer (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/medicines/expiring", "host": ["{{baseUrl}}"], "path": ["api", "medicines", "expiring"] }
+          }
+        },
+        {
+          "name": "Delete Medicine as Admin (admin only)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/medicines/{{medicineId}}", "host": ["{{baseUrl}}"], "path": ["api", "medicines", "{{medicineId}}"] }
+          }
+        },
+        {
+          "name": "Delete Medicine as Pharmacist (expect 403)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/medicines/{{medicineId}}", "host": ["{{baseUrl}}"], "path": ["api", "medicines", "{{medicineId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Place Order as Customer (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('orderId', pm.response.json().data._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"medicine\": \"{{medicineId}}\", \"quantity\": 3 }\n  ],\n  \"prescriptionNotes\": \"\"\n}"
+            },
+            "description": "unitPrice and totalAmount are computed server-side from current medicine price. Stock is NOT decremented here."
+          }
+        },
+        {
+          "name": "Place Order as Pharmacist (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [ { \"medicine\": \"{{medicineId}}\", \"quantity\": 1 } ]\n}"
+            }
+          }
+        },
+        {
+          "name": "My Orders (customer only)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/orders/my-orders", "host": ["{{baseUrl}}"], "path": ["api", "orders", "my-orders"] }
+          }
+        },
+        {
+          "name": "All Orders (pharmacist/admin, ?status filter)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [{ "key": "status", "value": "pending" }]
+            }
+          }
+        },
+        {
+          "name": "Approve Order as Pharmacist (decrements stock ONCE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "status"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "description": "STOCK DEDUCTION EXPECTATION: On this first approval, each item's medicine.stockQuantity is atomically reduced by the ordered quantity (guarded by { stockQuantity: { $gte: quantity } }). Verify with GET /api/medicines afterward: the medicine used above should drop by 3."
+          }
+        },
+        {
+          "name": "Re-approve Order (NO double decrement)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{pharmacistToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "status"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\"\n}"
+            },
+            "description": "Re-approving must NOT decrement stock again (guarded by order.stockDeducted). Verify medicine stock is unchanged vs. after the first approval."
+          }
+        },
+        {
+          "name": "Dispense Order as Admin",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["api", "orders", "{{orderId}}", "status"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"dispensed\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
